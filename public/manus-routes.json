@@ -1,0 +1,9 @@
+{
+  "routes": [
+    { "path": "/", "title": "Bhojraj India Group" },
+    { "path": "/businesses", "title": "Our Businesses — Bhojraj India Group" },
+    { "path": "/about", "title": "About the Group — Bhojraj India Group" },
+    { "path": "/social-foundation", "title": "Social Foundation — Bhojraj India Group" },
+    { "path": "/business/:slug", "title": "Business Detail — Bhojraj India Group" }
+  ]
+}
