@@ -1,7 +1,29 @@
+import { ADMIN_PATH, bindAdminEvents, escapeHtml, renderAdminPage } from './admin.js';
 import { aboutGroup, businesses, careersData, contact, getBusiness, newsUpdates, socialFoundation } from './data.js';
 import './styles.css';
 
 const app = document.querySelector('#app');
+
+let liveNewsUpdates = newsUpdates.map((item) => ({ ...item, content: [...(item.content || [])] }));
+let liveCareerOpenings = careersData.openings.map((job) => ({ ...job, skills: [...(job.skills || [])] }));
+
+const adminState = {
+  authenticated: false,
+  sessionChecked: false,
+  activeTab: 'news',
+  editorOpen: false,
+  editingId: null,
+  sidebarOpen: false,
+  busy: false,
+  error: '',
+  feedback: null,
+  get news() {
+    return liveNewsUpdates;
+  },
+  get careers() {
+    return liveCareerOpenings;
+  }
+};
 
 const icon = (name, size = 18) => {
   const paths = {
@@ -45,6 +67,7 @@ const header = (active = '') => `
         ${routeLink('/about', 'About Group', active === 'about' ? 'is-active' : '')}
         ${routeLink('/social-foundation', 'Social Foundation', active === 'foundation' ? 'is-active' : '')}
         ${routeLink('/careers', 'Careers', active === 'careers' ? 'is-active' : '')}
+        ${routeLink('/contact', 'Contact Us', active === 'contact' ? 'is-active' : '')}
       </nav>
       <div class="header-actions">
         <a class="header-contact" href="tel:${contact.phone}">${icon('phone', 14)} <span>${contact.phoneDisplay}</span></a>
@@ -58,6 +81,8 @@ const header = (active = '') => `
         ${routeLink('/about', 'About Group', 'mobile-nav__link')}
         ${routeLink('/social-foundation', 'Social Foundation', 'mobile-nav__link')}
         ${routeLink('/careers', 'Careers', 'mobile-nav__link')}
+        ${routeLink('/business-enquiry', 'Business Enquiry', 'mobile-nav__link')}
+        ${routeLink('/contact', 'Contact Us', 'mobile-nav__link')}
         <a class="button button--gold mobile-nav__cta" href="${contact.whatsapp}" target="_blank" rel="noreferrer">WhatsApp us ${icon('arrow', 16)}</a>
       </div>
     </div>
@@ -78,7 +103,10 @@ const footer = () => `
       </div>
       <div class="footer-cta">
         <p>For trade partnerships, distribution, and corporate inquiries.</p>
-        <a class="button button--gold" href="${contact.whatsapp}" target="_blank" rel="noreferrer">WhatsApp Us ${icon('arrow', 16)}</a>
+        <div class="footer-cta-actions">
+          <a class="button button--gold" href="/business-enquiry" data-route>Business Enquiry ${icon('arrow', 16)}</a>
+          <a class="button button--light" href="${contact.whatsapp}" target="_blank" rel="noreferrer">WhatsApp Us ${icon('arrow', 16)}</a>
+        </div>
         <div class="footer-social-links">
           ${contact.socials.map(s => `<a href="${s.url}" target="_blank" rel="noreferrer" class="social-chip">${s.name}</a>`).join('')}
         </div>
@@ -88,7 +116,11 @@ const footer = () => `
       <span>© 2026 Bhojraj India Group · ${contact.location}</span>
       <div class="footer-links">
         <span class="footer-credit">Built by <a href="https://growitate.com" target="_blank" rel="noopener noreferrer"><strong>GROWITATE</strong></a></span>
+        <a href="/business-enquiry" data-route>Business Enquiry</a>
+        <a href="/contact" data-route>Contact Us</a>
         <a href="mailto:${contact.email}">${contact.email}</a>
+        <a href="mailto:${contact.careersEmail}">${contact.careersEmail}</a>
+        <a href="mailto:${contact.directorEmail}">${contact.directorEmail}</a>
         <a href="tel:${contact.phone}">${contact.phoneDisplay}</a>
       </div>
     </div>
@@ -463,8 +495,8 @@ const renderHome = () => `
         <div class="contact-card__right">
           <p>Whether you are an overseas buyer, a domestic manufacturer, a farmer collective, or looking for reliable supply partnerships — Bhojraj India Group is ready to collaborate.</p>
           <div class="contact-card__actions">
-            <a class="button button--gold" href="${contact.whatsapp}" target="_blank" rel="noreferrer">WhatsApp Conversation ${icon('arrow', 16)}</a>
-            <a class="text-link" href="mailto:${contact.email}">Send an Email ${icon('arrow', 16)}</a>
+            <a class="button button--gold" href="/business-enquiry" data-route>Submit Business Enquiry ${icon('arrow', 16)}</a>
+            <a class="text-link" href="${contact.whatsapp}" target="_blank" rel="noreferrer">WhatsApp Conversation ${icon('arrow', 16)}</a>
           </div>
         </div>
       </div>
@@ -583,6 +615,7 @@ const renderAbout = () => `
             <blockquote class="leadership-quote">
               ${aboutGroup.leadership.quoteLine1} <em>${aboutGroup.leadership.quoteLine2}</em>
             </blockquote>
+            <a class="leadership-email" href="mailto:${contact.directorEmail}">${icon('mail', 15)} ${contact.directorEmail}</a>
           </div>
         </div>
         <div class="leadership-copy">
@@ -607,6 +640,7 @@ const renderAbout = () => `
           <div class="contact-list">
             <a href="tel:${contact.phone}">${icon('phone', 16)} ${contact.phoneDisplay}</a>
             <a href="mailto:${contact.email}">${icon('mail', 16)} ${contact.email}</a>
+            <a href="mailto:${contact.directorEmail}">${icon('mail', 16)} ${contact.directorEmail} (Director)</a>
             <a href="${contact.websiteUrl}" target="_blank" rel="noreferrer">${icon('globe', 16)} ${contact.website}</a>
             <a href="${contact.whatsapp}" target="_blank" rel="noreferrer">${icon('arrow', 16)} WhatsApp Chat (${contact.phoneDisplay})</a>
           </div>
@@ -654,10 +688,10 @@ const renderBusiness = (business) => `
           ` : ''}
 
           <div class="detail-hero-actions">
-            <a class="button button--gold" href="${contact.whatsapp}" target="_blank" rel="noreferrer">
-              Inquire with this division ${icon('arrow', 16)}
+            <a class="button button--gold" href="/business-enquiry?division=${business.slug}" data-route>
+              Send Business Enquiry ${icon('arrow', 16)}
             </a>
-            <a class="text-link" href="mailto:${contact.email}">Email Coordinator ${icon('arrow', 16)}</a>
+            <a class="text-link" href="${contact.whatsapp}" target="_blank" rel="noreferrer">WhatsApp Coordinator ${icon('arrow', 16)}</a>
           </div>
         </div>
 
@@ -761,7 +795,7 @@ const renderBusiness = (business) => `
     ` : ''}
 
     <!-- News & Updates (Bhojraj Digital News Network — Context Over Noise) -->
-    ${business.slug === 'news' && newsUpdates.length ? `
+    ${business.slug === 'news' && liveNewsUpdates.length ? `
       <section class="section section--news-updates" id="news-updates">
         <div class="container">
           <div class="section-heading">
@@ -772,16 +806,16 @@ const renderBusiness = (business) => `
             <a class="text-link text-link--desktop" href="/contact" data-route>News &amp; Media Enquiry ${icon('arrow', 16)}</a>
           </div>
           <div class="news-grid">
-            ${newsUpdates.map((post) => `
+            ${liveNewsUpdates.map((post) => `
               <article class="news-card">
                 <div class="news-card__meta">
-                  <span class="news-card__cat">${post.category}</span>
-                  <time class="news-card__date">${post.date}</time>
+                  <span class="news-card__cat">${escapeHtml(post.category)}</span>
+                  <time class="news-card__date">${escapeHtml(post.date)}</time>
                 </div>
-                <span class="news-card__division">${post.division}</span>
-                <h3>${post.title}</h3>
-                <p>${post.summary}</p>
-                <button class="news-card__more" type="button" data-news-id="${post.id}">
+                <span class="news-card__division">${escapeHtml(post.division)}</span>
+                <h3>${escapeHtml(post.title)}</h3>
+                <p>${escapeHtml(post.summary)}</p>
+                <button class="news-card__more" type="button" data-news-id="${escapeHtml(post.id)}">
                   Read full briefing ${icon('arrow', 14)}
                 </button>
               </article>
@@ -921,11 +955,11 @@ const renderBusiness = (business) => `
           <p>Indore, Madhya Pradesh, India · www.bhojrajgroup.in · @bhojrajindiagroup</p>
         </div>
         <div class="division-cta-actions">
-          <a class="button button--gold" href="${contact.whatsapp}" target="_blank" rel="noreferrer">
-            Start WhatsApp Chat ${icon('arrow', 16)}
+          <a class="button button--gold" href="/business-enquiry?division=${business.slug}" data-route>
+            Business Enquiry ${icon('arrow', 16)}
           </a>
-          <a class="button button--light" href="mailto:${contact.email}">
-            Email Arjun Bhojraj ${icon('arrow', 16)}
+          <a class="button button--light" href="${contact.whatsapp}" target="_blank" rel="noreferrer">
+            WhatsApp Chat ${icon('arrow', 16)}
           </a>
         </div>
       </div>
@@ -1114,31 +1148,34 @@ const renderContact = () => {
 
   let enquiryTitle = 'Corporate, Trade & Media Enquiries';
   let enquirySummary = 'Connect directly with Bhojraj India Group in Indore for global trade partnerships, manufacturing contracts, institutional supply, magazine subscriptions, or media collaborations.';
+  let defaultTopic = 'General / Corporate Enquiry';
   let whatsappUrl = contact.whatsapp;
   let mailHref = `mailto:${contact.email}`;
 
   if (selectedIssue) {
     enquiryTitle = `Bhojraj India Magazine — Issue ${selectedIssue.number} (${selectedIssue.month})`;
-    enquirySummary = `${selectedIssue.volume} · Feature Theme: ${selectedIssue.theme}. Reach out below to request a copy, institutional placement, or edition partnership.`;
+    enquirySummary = `${selectedIssue.volume} · Feature Theme: ${selectedIssue.theme}. Submit the contact form or reach out directly below.`;
+    defaultTopic = `Bhojraj India Magazine — Issue ${selectedIssue.number} (${selectedIssue.month})`;
     const msg = `Hello Bhojraj India Group, I would like to enquire about Bhojraj India Magazine — ${selectedIssue.volume} (${selectedIssue.theme}).`;
     whatsappUrl = `${contact.whatsapp}?text=${encodeURIComponent(msg)}`;
     mailHref = `mailto:${contact.email}?subject=${encodeURIComponent(`Enquiry: Bhojraj India Magazine Issue ${selectedIssue.number} (${selectedIssue.month})`)}&body=${encodeURIComponent(msg)}`;
   } else if (isSubscription) {
     enquiryTitle = 'Bhojraj India Magazine — 1-Year Subscription (12 Issues)';
-    enquirySummary = 'Annual Print & Digital Series covering all 12 monthly editions (January – December 2027). Reach out via WhatsApp, email, or phone to activate your subscription.';
+    enquirySummary = 'Annual Print & Digital Series covering all 12 monthly editions (January – December 2027). Submit the contact form below to activate your subscription.';
+    defaultTopic = 'Bhojraj India Magazine — 1-Year Subscription (12 Issues)';
     const msg = 'Hello Bhojraj India Group, I would like to subscribe to the 1-Year Subscription (12 Issues) of Bhojraj India Magazine.';
     whatsappUrl = `${contact.whatsapp}?text=${encodeURIComponent(msg)}`;
     mailHref = `mailto:${contact.email}?subject=${encodeURIComponent('1-Year Subscription Enquiry — Bhojraj India Magazine')}&body=${encodeURIComponent(msg)}`;
   }
 
   return `
-    ${header()}
+    ${header('contact')}
     <main>
       <section class="page-hero page-hero--contact">
         <div class="container page-hero__inner">
-          <div class="eyebrow eyebrow--gold">/ Contact Desk · ${contact.location}</div>
+          <div class="eyebrow eyebrow--gold">/ 10 · Contact Us · ${contact.location}</div>
           <h1>Connect with<br /><em>Bhojraj India Group.</em></h1>
-          <p>Headquartered in Indore, Madhya Pradesh — connecting Indian enterprise, publications, and supply chains with domestic and global partners.</p>
+          <p>Send a message directly to our business desk at <strong>${contact.email}</strong> or connect via phone and WhatsApp.</p>
         </div>
         <div class="page-hero__mark">B/IG</div>
       </section>
@@ -1157,24 +1194,165 @@ const renderContact = () => {
             </div>
           ` : ''}
 
-          <div class="contact-card contact-page-card">
-            <div>
-              <div class="eyebrow eyebrow--gold">Direct Communication Desk</div>
-              <h2>Start a<br /><em>Conversation.</em></h2>
+          <div class="contact-page-grid">
+            <div class="contact-card contact-page-card">
+              <div>
+                <div class="eyebrow eyebrow--gold">Direct Communication Desk</div>
+                <h2>Reach Our<br /><em>Indore HQ.</em></h2>
+                <p class="contact-card-lead">${enquirySummary}</p>
+                <div class="contact-card__actions">
+                  <a class="button button--gold" href="${whatsappUrl}" target="_blank" rel="noreferrer">WhatsApp Conversation ${icon('arrow', 16)}</a>
+                  <a class="text-link" href="/business-enquiry" data-route>Commercial Business Enquiry ${icon('arrow', 16)}</a>
+                </div>
+                <div class="contact-list contact-page-list">
+                  <a href="tel:${contact.phone}">${icon('phone', 16)} ${contact.phoneDisplay}</a>
+                  <a href="${mailHref}">${icon('mail', 16)} ${contact.email} (General &amp; Business)</a>
+                  <a href="mailto:${contact.directorEmail}">${icon('mail', 16)} ${contact.directorEmail} (Director)</a>
+                  <a href="mailto:${contact.careersEmail}">${icon('mail', 16)} ${contact.careersEmail} (Careers)</a>
+                  <a href="${contact.websiteUrl}" target="_blank" rel="noreferrer">${icon('globe', 16)} ${contact.website}</a>
+                </div>
+              </div>
             </div>
-            <div class="contact-card__right">
-              <p>${enquirySummary}</p>
-              <div class="contact-card__actions">
-                <a class="button button--gold" href="${whatsappUrl}" target="_blank" rel="noreferrer">WhatsApp Conversation ${icon('arrow', 16)}</a>
-                <a class="text-link" href="${mailHref}">Send an Email ${icon('arrow', 16)}</a>
+
+            <form class="careers-form" id="contactUsForm" novalidate>
+              <div class="form-head">
+                <div class="eyebrow eyebrow--gold">Direct Email Dispatch</div>
+                <h3>Send Us a Message</h3>
+                <p>Submissions are delivered straight to <strong>${contact.email}</strong>.</p>
               </div>
-              <div class="contact-list contact-page-list">
-                <a href="tel:${contact.phone}">${icon('phone', 16)} ${contact.phoneDisplay}</a>
-                <a href="${mailHref}">${icon('mail', 16)} ${contact.email}</a>
-                <a href="${contact.websiteUrl}" target="_blank" rel="noreferrer">${icon('globe', 16)} ${contact.website}</a>
+              <input class="honeypot-field" type="text" name="_honey" tabindex="-1" autocomplete="off" aria-hidden="true" />
+              <div class="careers-form__row">
+                <div class="careers-field">
+                  <label for="contactName">Full Name *</label>
+                  <input id="contactName" name="name" type="text" required placeholder="Your full name" />
+                </div>
+                <div class="careers-field">
+                  <label for="contactPhone">Phone Number *</label>
+                  <input id="contactPhone" name="phone" type="tel" required placeholder="+91 98XXX XXXXX" />
+                </div>
               </div>
+              <div class="careers-form__row">
+                <div class="careers-field">
+                  <label for="contactEmail">Email Address *</label>
+                  <input id="contactEmail" name="email" type="email" required placeholder="you@example.com" />
+                </div>
+                <div class="careers-field">
+                  <label for="contactSubject">Subject / Topic *</label>
+                  <input id="contactSubject" name="subject" type="text" required value="${escapeHtml(defaultTopic)}" placeholder="Subject of your enquiry" />
+                </div>
+              </div>
+              <div class="careers-field">
+                <label for="contactMessage">Message *</label>
+                <textarea id="contactMessage" name="message" rows="5" required placeholder="How can our team assist you?"></textarea>
+              </div>
+              <div class="careers-form__actions">
+                <button class="button button--gold" type="submit">Send Message ${icon('arrow', 16)}</button>
+              </div>
+              <div class="career-form-status" id="contactFormStatus" hidden aria-live="polite"></div>
+            </form>
+          </div>
+        </div>
+      </section>
+    </main>
+    ${footer()}
+  `;
+};
+
+const renderBusinessEnquiry = () => {
+  const params = new URLSearchParams(window.location.search);
+  const divisionSlug = params.get('division');
+  const selectedBusiness = divisionSlug ? getBusiness(divisionSlug) : null;
+  const divisionOptions = [
+    ...businesses.map((b) => ({ slug: b.slug, label: `${b.divisionName} (${b.label})` })),
+    { slug: 'social-foundation', label: 'Bhojraj India Social Foundation' },
+    { slug: 'general', label: 'Multi-Division / Corporate Partnership' }
+  ];
+
+  return `
+    ${header()}
+    <main class="page-business-enquiry">
+      <section class="page-hero">
+        <div class="container page-hero__inner">
+          <div class="eyebrow eyebrow--gold">/ 09 · Business Enquiry · ${contact.location}</div>
+          <h1>Partner With<br /><em>Bhojraj India Group.</em></h1>
+          <p>Submit trade, bulk supply, export-import, manufacturing, manpower, construction, or media partnership enquiries directly to <strong>${contact.email}</strong>.</p>
+        </div>
+        <div class="page-hero__mark">B/IG</div>
+      </section>
+
+      <section class="section section--careers-apply">
+        <div class="container careers-apply-grid">
+          <div class="careers-apply-copy">
+            <div class="eyebrow eyebrow--gold">Commercial Desk · Worldwide</div>
+            <h2>Discuss Your<br /><em>Business Requirement.</em></h2>
+            <p>Whether sourcing spices and grains, commissioning OEM industrial manufacturing, booking institutional placements, or starting a commercial collaboration, our division coordinators in Indore respond promptly.</p>
+            <div class="careers-direct-box">
+              <strong>Direct Commercial Desk</strong>
+              <a href="mailto:${contact.email}">${icon('mail', 15)} ${contact.email}</a>
+              <a href="tel:${contact.phone}">${icon('phone', 15)} ${contact.phoneDisplay}</a>
+              <a href="${contact.whatsapp}" target="_blank" rel="noreferrer">${icon('arrow', 15)} WhatsApp Trade Desk</a>
             </div>
           </div>
+
+          <form class="careers-form" id="businessEnquiryForm" novalidate>
+            <div class="form-head">
+              <div class="eyebrow eyebrow--gold">Routed to ${contact.email}</div>
+              <h3>Business Enquiry Form</h3>
+            </div>
+            <input class="honeypot-field" type="text" name="_honey" tabindex="-1" autocomplete="off" aria-hidden="true" />
+            <div class="careers-form__row">
+              <div class="careers-field">
+                <label for="bizName">Full Name *</label>
+                <input id="bizName" name="name" type="text" required placeholder="Your full name" />
+              </div>
+              <div class="careers-field">
+                <label for="bizCompany">Company / Organization</label>
+                <input id="bizCompany" name="company" type="text" placeholder="Company or organization name" />
+              </div>
+            </div>
+            <div class="careers-form__row">
+              <div class="careers-field">
+                <label for="bizEmail">Business Email *</label>
+                <input id="bizEmail" name="email" type="email" required placeholder="name@company.com" />
+              </div>
+              <div class="careers-field">
+                <label for="bizPhone">Phone / WhatsApp Number *</label>
+                <input id="bizPhone" name="phone" type="tel" required placeholder="+91 98XXX XXXXX" />
+              </div>
+            </div>
+            <div class="careers-form__row">
+              <div class="careers-field">
+                <label for="bizDivision">Division of Interest *</label>
+                <select id="bizDivision" name="division" required>
+                  ${divisionOptions.map((opt) => `<option value="${escapeHtml(opt.label)}" ${selectedBusiness?.slug === opt.slug ? 'selected' : ''}>${escapeHtml(opt.label)}</option>`).join('')}
+                </select>
+              </div>
+              <div class="careers-field">
+                <label for="bizType">Enquiry Nature *</label>
+                <select id="bizType" name="enquiryType" required>
+                  <option value="Export / Import & Global Sourcing">Export / Import & Global Sourcing</option>
+                  <option value="Wholesale & Bulk Distribution">Wholesale & Bulk Distribution</option>
+                  <option value="Contract / OEM Manufacturing">Contract / OEM Manufacturing</option>
+                  <option value="Construction & Civil Contracting">Construction & Civil Contracting</option>
+                  <option value="Workforce & Manpower Staffing">Workforce & Manpower Staffing</option>
+                  <option value="Media, News, Magazine or Podcast">Media, News, Magazine or Podcast</option>
+                  <option value="General Corporate Partnership">General Corporate Partnership</option>
+                </select>
+              </div>
+            </div>
+            <div class="careers-field">
+              <label for="bizLocation">City / Country</label>
+              <input id="bizLocation" name="location" type="text" placeholder="e.g. Mumbai, India / Dubai, UAE" />
+            </div>
+            <div class="careers-field">
+              <label for="bizMessage">Requirement Details &amp; Quantity / Scope *</label>
+              <textarea id="bizMessage" name="message" rows="5" required placeholder="Share product specifications, service requirements, timeline, or partnership goals."></textarea>
+            </div>
+            <div class="careers-form__actions">
+              <button class="button button--gold" type="submit">Submit Business Enquiry ${icon('arrow', 16)}</button>
+            </div>
+            <div class="career-form-status" id="businessFormStatus" hidden aria-live="polite"></div>
+          </form>
         </div>
       </section>
     </main>
@@ -1233,29 +1411,29 @@ const renderCareers = () => `
           </div>
         </div>
         <div class="careers-openings-grid">
-          ${careersData.openings.map((job) => `
-            <article class="career-card" data-career-cat="${job.category}">
+          ${liveCareerOpenings.length ? liveCareerOpenings.map((job) => `
+            <article class="career-card" data-career-cat="${escapeHtml(job.category)}">
               <div class="career-card__head">
-                <span class="career-card__division">${job.division}</span>
-                <span class="career-card__type">${job.type}</span>
+                <span class="career-card__division">${escapeHtml(job.division)}</span>
+                <span class="career-card__type">${escapeHtml(job.type)}</span>
               </div>
-              <h3>${job.title}</h3>
+              <h3>${escapeHtml(job.title)}</h3>
               <div class="career-card__meta">
-                <span>${job.location}</span>
-                <span>${job.experience}</span>
-                <span>${job.posted}</span>
+                <span>${escapeHtml(job.location)}</span>
+                <span>${escapeHtml(job.experience)}</span>
+                <span>${escapeHtml(job.posted)}</span>
               </div>
-              <p>${job.summary}</p>
+              <p>${escapeHtml(job.summary)}</p>
               <div class="career-card__skills">
-                ${job.skills.map((skill) => `<span class="card-pillar">${skill}</span>`).join('')}
+                ${(job.skills || []).map((skill) => `<span class="card-pillar">${escapeHtml(skill)}</span>`).join('')}
               </div>
               <div class="career-card__foot">
-                <button class="button button--gold career-apply-btn" type="button" data-apply-role="${job.title} (${job.division})">
+                <button class="button button--gold career-apply-btn" type="button" data-apply-role="${escapeHtml(`${job.title} (${job.division})`)}">
                   Apply for Role ${icon('arrow', 15)}
                 </button>
               </div>
             </article>
-          `).join('')}
+          `).join('') : '<p class="careers-empty">No open positions listed at the moment. You can still submit a general application below.</p>'}
         </div>
       </div>
     </section>
@@ -1265,15 +1443,16 @@ const renderCareers = () => `
         <div class="careers-apply-copy">
           <div class="eyebrow eyebrow--gold">Candidate Desk · Indore HQ</div>
           <h2>Submit Your<br /><em>Application.</em></h2>
-          <p>Interested in one of the open roles above or exploring future opportunities across our 09 business verticals? Share your profile details below to route your application directly to HR at <strong>${contact.email}</strong>.</p>
+          <p>Interested in one of the open roles above or exploring future opportunities across our 09 business verticals? Share your profile details below to route your application directly to HR at <strong>${contact.careersEmail}</strong>.</p>
           <div class="careers-direct-box">
             <strong>Direct HR Contact</strong>
-            <a href="mailto:${contact.email}">${icon('mail', 15)} ${contact.email}</a>
+            <a href="mailto:${contact.careersEmail}">${icon('mail', 15)} ${contact.careersEmail}</a>
             <a href="tel:${contact.phone}">${icon('phone', 15)} ${contact.phoneDisplay}</a>
             <a href="${contact.whatsapp}" target="_blank" rel="noreferrer">${icon('arrow', 15)} WhatsApp Talent Desk</a>
           </div>
         </div>
         <form class="careers-form" id="careerApplicationForm" novalidate>
+          <input class="honeypot-field" type="text" name="_honey" tabindex="-1" autocomplete="off" aria-hidden="true" />
           <div class="careers-form__row">
             <div class="careers-field">
               <label for="careerName">Full Name *</label>
@@ -1292,7 +1471,7 @@ const renderCareers = () => `
             <div class="careers-field">
               <label for="careerRole">Position / Division *</label>
               <select id="careerRole" name="role" required>
-                ${careersData.openings.map((job) => `<option value="${job.title} (${job.division})">${job.title} — ${job.division}</option>`).join('')}
+                ${liveCareerOpenings.map((job) => `<option value="${escapeHtml(`${job.title} (${job.division})`)}">${escapeHtml(job.title)} — ${escapeHtml(job.division)}</option>`).join('')}
                 <option value="General / Future Opening (Bhojraj India Group)">General Application — Other Verticals</option>
               </select>
             </div>
@@ -1312,7 +1491,7 @@ const renderCareers = () => `
             <textarea id="careerNote" name="note" rows="4" required placeholder="Share your key skills, preferred Indore/regional location, and notice period."></textarea>
           </div>
           <div class="careers-form__actions">
-            <button class="button button--gold" type="submit">Prepare Email Application ${icon('arrow', 16)}</button>
+            <button class="button button--gold" type="submit">Submit Application ${icon('arrow', 16)}</button>
           </div>
           <div class="career-form-status" id="careerFormStatus" hidden aria-live="polite"></div>
         </form>
@@ -1339,6 +1518,23 @@ const setMobileMenuState = (open) => {
   if (mobileNav) mobileNav.setAttribute('aria-hidden', String(!open));
 };
 
+const syncCmsData = async (override = null) => {
+  if (override && (Array.isArray(override.news) || Array.isArray(override.careers))) {
+    if (Array.isArray(override.news)) liveNewsUpdates = override.news;
+    if (Array.isArray(override.careers)) liveCareerOpenings = override.careers;
+    return;
+  }
+  try {
+    const res = await fetch('/api/cms', { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (Array.isArray(data.news)) liveNewsUpdates = data.news;
+    if (Array.isArray(data.careers)) liveCareerOpenings = data.careers;
+  } catch {
+    // Keep bundled initial data if running purely static preview.
+  }
+};
+
 const render = () => {
   setMobileMenuState(false);
   document.body.classList.remove('modal-open');
@@ -1348,7 +1544,9 @@ const render = () => {
   else if (path === '/about') app.innerHTML = renderAbout();
   else if (path === '/social-foundation') app.innerHTML = renderSocialFoundation();
   else if (path === '/careers') app.innerHTML = renderCareers();
+  else if (path === '/business-enquiry') app.innerHTML = renderBusinessEnquiry();
   else if (path === '/contact') app.innerHTML = renderContact();
+  else if (path === ADMIN_PATH) app.innerHTML = renderAdminPage(adminState);
   else if (path.startsWith('/business/')) {
     const business = getBusiness(path.split('/')[2]);
     app.innerHTML = business ? renderBusiness(business) : renderNotFound();
@@ -1411,7 +1609,7 @@ const bindInteractions = () => {
     };
     document.querySelectorAll('[data-news-id]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const post = newsUpdates.find((item) => item.id === btn.dataset.newsId);
+        const post = liveNewsUpdates.find((item) => item.id === btn.dataset.newsId);
         if (!post) return;
         document.getElementById('newsModalCat').textContent = post.category;
         document.getElementById('newsModalDate').textContent = post.date;
@@ -1457,66 +1655,190 @@ const bindInteractions = () => {
     });
   });
 
-  const careerForm = document.getElementById('careerApplicationForm');
-  const careerStatus = document.getElementById('careerFormStatus');
-  if (careerForm && careerStatus) {
-    careerForm.addEventListener('submit', (event) => {
-      event.preventDefault();
-      const formData = new FormData(careerForm);
-      const name = String(formData.get('name') || '').trim();
-      const phone = String(formData.get('phone') || '').trim();
-      const email = String(formData.get('email') || '').trim();
-      const role = String(formData.get('role') || '').trim();
-      const experience = String(formData.get('experience') || '').trim();
-      const portfolio = String(formData.get('portfolio') || '').trim();
-      const note = String(formData.get('note') || '').trim();
+  const attachEmailRoutedForm = ({ formId, statusId, formType, targetEmail = contact.email, idleLabel, successHeading, buildPayload, buildSubjectBody }) => {
+    const form = document.getElementById(formId);
+    const statusEl = document.getElementById(statusId);
+    if (!form || !statusEl) return;
 
-      if (!name || !phone || !email || !note) {
-        careerStatus.className = 'career-form-status career-form-status--error';
-        careerStatus.textContent = 'Please complete your Name, Phone, Email, and Introduction before submitting.';
-        careerStatus.hidden = false;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const fd = new FormData(form);
+      const { payload, errorMsg } = buildPayload(fd);
+
+      if (errorMsg) {
+        statusEl.className = 'career-form-status career-form-status--error';
+        statusEl.textContent = errorMsg;
+        statusEl.hidden = false;
         return;
       }
 
-      const subject = `Career Application: ${role} — ${name}`;
-      const bodyText = [
-        `Role Applied For: ${role}`,
-        `Full Name: ${name}`,
-        `Phone: ${phone}`,
-        `Email: ${email}`,
-        experience ? `Experience: ${experience}` : '',
-        portfolio ? `Resume / LinkedIn: ${portfolio}` : '',
-        '',
-        'Cover Note:',
-        note
-      ].filter(Boolean).join('\n');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Sending...';
+      }
+      statusEl.hidden = true;
 
-      const mailtoHref = `mailto:${contact.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyText)}`;
+      const { subject, bodyText } = buildSubjectBody(payload);
       const waHref = `${contact.whatsapp}?text=${encodeURIComponent(bodyText)}`;
 
-      const msg = document.createElement('p');
-      msg.textContent = `Thank you, ${name}. Your application for "${role}" is ready to send to ${contact.email}:`;
-      const actions = document.createElement('div');
-      actions.className = 'career-status-actions';
+      try {
+        const res = await fetch('/api/forms/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...payload, formType, _honey: String(fd.get('_honey') || '') })
+        });
+        const result = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(result.error || 'Could not submit form.');
 
-      const mailLink = document.createElement('a');
-      mailLink.className = 'button button--gold';
-      mailLink.href = mailtoHref;
-      mailLink.textContent = `Open Email App (${contact.email})`;
+        const destEmail = result.targetEmail || targetEmail;
+        const mailtoHref = `mailto:${destEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyText)}`;
+        const msg = document.createElement('p');
+        if (result.delivered) {
+          msg.textContent = `${successHeading} Your submission has been sent to ${destEmail}.`;
+          form.reset();
+        } else if (result.activationPending) {
+          msg.textContent = `Your submission was recorded, and an email activation link was sent to ${destEmail}. Once activated, all forms deliver automatically. You can also send via email or WhatsApp below:`;
+        } else {
+          msg.textContent = `Your submission was saved on our server. You can also send a direct copy to ${destEmail} or WhatsApp below:`;
+        }
 
-      const waLink = document.createElement('a');
-      waLink.className = 'button button--light';
-      waLink.href = waHref;
-      waLink.target = '_blank';
-      waLink.rel = 'noreferrer';
-      waLink.textContent = 'Send via WhatsApp';
+        const actions = document.createElement('div');
+        actions.className = 'career-status-actions';
+        if (!result.delivered) {
+          const mailLink = document.createElement('a');
+          mailLink.className = 'button button--gold';
+          mailLink.href = mailtoHref;
+          mailLink.textContent = `Send via Email App (${destEmail})`;
+          actions.append(mailLink);
+        }
+        const waLink = document.createElement('a');
+        waLink.className = 'button button--light';
+        waLink.href = waHref;
+        waLink.target = '_blank';
+        waLink.rel = 'noreferrer';
+        waLink.textContent = 'Also Message on WhatsApp';
+        actions.append(waLink);
 
-      actions.append(mailLink, waLink);
-      careerStatus.className = 'career-form-status career-form-status--ok';
-      careerStatus.replaceChildren(msg, actions);
-      careerStatus.hidden = false;
-      window.location.href = mailtoHref;
+        statusEl.className = 'career-form-status career-form-status--ok';
+        statusEl.replaceChildren(msg, actions);
+        statusEl.hidden = false;
+      } catch (err) {
+        statusEl.className = 'career-form-status career-form-status--error';
+        statusEl.textContent = err?.message || 'Unable to submit right now. Please try Email or WhatsApp directly.';
+        statusEl.hidden = false;
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = `${idleLabel} ${icon('arrow', 16)}`;
+        }
+      }
     });
+  };
+
+  attachEmailRoutedForm({
+    formId: 'businessEnquiryForm',
+    statusId: 'businessFormStatus',
+    formType: 'business-enquiry',
+    idleLabel: 'Submit Business Enquiry',
+    successHeading: 'Thank you!',
+    buildPayload: (fd) => {
+      const name = String(fd.get('name') || '').trim();
+      const email = String(fd.get('email') || '').trim();
+      const phone = String(fd.get('phone') || '').trim();
+      const company = String(fd.get('company') || '').trim();
+      const division = String(fd.get('division') || '').trim();
+      const enquiryType = String(fd.get('enquiryType') || '').trim();
+      const location = String(fd.get('location') || '').trim();
+      const message = String(fd.get('message') || '').trim();
+      if (!name || !email || !phone || !message) {
+        return { errorMsg: 'Please fill in your Name, Business Email, Phone Number, and Requirement Details.' };
+      }
+      return { payload: { name, email, phone, company, division, enquiryType, location, message } };
+    },
+    buildSubjectBody: (p) => ({
+      subject: `Business Enquiry: ${p.division} — ${p.name}`,
+      bodyText: [
+        `Division: ${p.division}`,
+        `Enquiry Nature: ${p.enquiryType}`,
+        `Name: ${p.name}`,
+        p.company ? `Company: ${p.company}` : '',
+        `Email: ${p.email}`,
+        `Phone: ${p.phone}`,
+        p.location ? `City / Country: ${p.location}` : '',
+        '',
+        p.message
+      ].filter(Boolean).join('\n')
+    })
+  });
+
+  attachEmailRoutedForm({
+    formId: 'contactUsForm',
+    statusId: 'contactFormStatus',
+    formType: 'contact',
+    idleLabel: 'Send Message',
+    successHeading: 'Thank you!',
+    buildPayload: (fd) => {
+      const name = String(fd.get('name') || '').trim();
+      const email = String(fd.get('email') || '').trim();
+      const phone = String(fd.get('phone') || '').trim();
+      const subject = String(fd.get('subject') || '').trim();
+      const message = String(fd.get('message') || '').trim();
+      if (!name || !email || !phone || !message) {
+        return { errorMsg: 'Please complete your Name, Email, Phone Number, and Message.' };
+      }
+      return { payload: { name, email, phone, subject, message } };
+    },
+    buildSubjectBody: (p) => ({
+      subject: `Contact Enquiry: ${p.subject} — ${p.name}`,
+      bodyText: [
+        `Topic: ${p.subject}`,
+        `Name: ${p.name}`,
+        `Email: ${p.email}`,
+        `Phone: ${p.phone}`,
+        '',
+        p.message
+      ].join('\n')
+    })
+  });
+
+  attachEmailRoutedForm({
+    formId: 'careerApplicationForm',
+    statusId: 'careerFormStatus',
+    formType: 'career',
+    targetEmail: contact.careersEmail,
+    idleLabel: 'Submit Application',
+    successHeading: 'Thank you!',
+    buildPayload: (fd) => {
+      const name = String(fd.get('name') || '').trim();
+      const phone = String(fd.get('phone') || '').trim();
+      const email = String(fd.get('email') || '').trim();
+      const role = String(fd.get('role') || '').trim();
+      const experience = String(fd.get('experience') || '').trim();
+      const portfolio = String(fd.get('portfolio') || '').trim();
+      const note = String(fd.get('note') || '').trim();
+      if (!name || !phone || !email || !note) {
+        return { errorMsg: 'Please complete your Name, Phone, Email, and Introduction before submitting.' };
+      }
+      return { payload: { name, phone, email, role, experience, portfolio, message: note } };
+    },
+    buildSubjectBody: (p) => ({
+      subject: `Career Application: ${p.role} — ${p.name}`,
+      bodyText: [
+        `Role Applied For: ${p.role}`,
+        `Name: ${p.name}`,
+        `Phone: ${p.phone}`,
+        `Email: ${p.email}`,
+        p.experience ? `Experience: ${p.experience}` : '',
+        p.portfolio ? `Resume / LinkedIn: ${p.portfolio}` : '',
+        '',
+        p.message
+      ].filter(Boolean).join('\n')
+    })
+  });
+
+  if (getRoute() === ADMIN_PATH) {
+    bindAdminEvents({ state: adminState, rerender: render, onSyncCms: syncCmsData });
   }
 
   if (activeRevealObserver) {
@@ -1550,6 +1872,17 @@ document.addEventListener('keydown', (event) => {
       newsModal.hidden = true;
       document.body.classList.remove('modal-open');
     }
+    ['adminLockedModal', 'adminDeleteModal'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el && !el.hidden) {
+        el.hidden = true;
+        document.body.classList.remove('modal-open');
+      }
+    });
+    if (adminState.sidebarOpen) {
+      adminState.sidebarOpen = false;
+      render();
+    }
   }
 });
 
@@ -1562,5 +1895,27 @@ document.addEventListener('click', (event) => {
   }
 });
 
+const bootApp = async () => {
+  render();
+  const tasks = [syncCmsData()];
+  if (getRoute() === ADMIN_PATH) {
+    tasks.push(
+      fetch('/api/admin/session', { cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : { authenticated: false }))
+        .then((data) => {
+          adminState.authenticated = Boolean(data.authenticated);
+          adminState.sessionChecked = true;
+        })
+        .catch(() => {
+          adminState.sessionChecked = true;
+        })
+    );
+  }
+  await Promise.all(tasks);
+  if (getRoute() === ADMIN_PATH || getRoute() === '/careers' || getRoute() === '/business/news') {
+    render();
+  }
+};
+
 window.addEventListener('popstate', render);
-render();
+bootApp();

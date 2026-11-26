@@ -2,6 +2,8 @@ export const contact = {
   phone: '9203936266',
   phoneDisplay: '+91 92039 36266',
   email: 'contact@bhojrajgroup.in',
+  careersEmail: 'careers@bhojrajgroup.in',
+  directorEmail: 'director@bhojrajgroup.in',
   whatsapp: 'https://wa.me/919203936266',
   website: 'www.bhojrajgroup.in',
   websiteUrl: 'https://www.bhojrajgroup.in',
